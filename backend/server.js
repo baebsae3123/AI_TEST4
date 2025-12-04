@@ -24,7 +24,7 @@ const asyncMiddleware = fn => (req, res, next) => {
 };
 
 // ===================================
-// ===== MongoDB 모델 정의 (스키마 생략) =====
+// ===== MongoDB 모델 정의 (스키마는 간략화) =====
 // ===================================
 const movieSchema = new mongoose.Schema({ /* ... */ });
 const musicSchema = new mongoose.Schema({ /* ... */ });
@@ -40,7 +40,7 @@ const Selection = mongoose.models.Selection || mongoose.model("Selection", selec
 // ===== 미들웨어 및 요청 로깅 설정 =====
 // ===================================
 
-// --- 1. CORS 설정 강화 (404/fetch 오류 방지) ---
+// --- 1. CORS 설정 강화 ---
 const allowedOrigins = [
     'http://localhost:3000', 
     'http://localhost:4000',
@@ -97,10 +97,11 @@ app.use(express.static(path.resolve(process.cwd(), "HumanMovieProject-main")));
 
 
 // ===================================
-// ===== 질문 API =====
+// ===== 질문 API (Questions) 라우트 설정 =====
 // ===================================
+
+// 1. 정상 경로 라우터
 app.get("/questions", (req, res) => {
-    // 💡 요청 로그가 미들웨어에서 처리되므로, 이 곳은 깔끔하게 유지합니다.
     const questions = [
         { id: 1, title: "선호 장르/소재", type: "multi", maxSelect: 3, options: ["액션","코미디","로맨스","드라마","SF·판타지","스릴러·공포","애니","다큐"] },
         { id: 2, title: "감상 목적·정서 성향", type: "multi", maxSelect: 2, options: ["가볍게 웃으며","깊은 여운","몰입감 높은 스릴","설렘·따뜻함"] },
@@ -111,6 +112,18 @@ app.get("/questions", (req, res) => {
     res.json(questions);
 });
 
+// 2. 💡 임시 방편: /undefined/questions 경로 처리 (프론트엔드 수정 후 반드시 제거해야 함)
+app.get("/undefined/questions", (req, res) => {
+    console.log(`🚨 [Undefined Path Hit] - WARNING: /undefined/questions route was used! Please fix the frontend URL.`); 
+    const questions = [
+        { id: 1, title: "선호 장르/소재", type: "multi", maxSelect: 3, options: ["액션","코미디","로맨스","드라마","SF·판타지","스릴러·공포","애니","다큐"] },
+        { id: 2, title: "감상 목적·정서 성향", type: "multi", maxSelect: 2, options: ["가볍게 웃으며","깊은 여운","몰입감 높은 스릴","설렘·따뜻함"] },
+        { id: 3, title: "제작 스타일·형식 선호도", type: "single", options: ["블록버스터","독창적·예술적","일상적·현실","실험적"] },
+        { id: 4, title: "선호 국가·문화권", type: "single", options: ["한국","미국","유럽","일본","중국·홍콩","기타 아시아","상관 없음"] },
+        { id: 5, title: "기피 장르", type: "multi", options: ["액션","코미디","로맨스","드라마","SF·판타지","스릴러·공포","다큐","없음"] }
+    ];
+    res.json(questions);
+});
 // ===================================
 // ===== 기타 API (select, recommend, selections) (동일) =====
 // ===================================
@@ -205,7 +218,6 @@ async function main() {
 
     } catch (err) {
         console.error("❌ MongoDB connection error:", err);
-        // MongoDB 연결 실패 시 Render 로그에 명확히 출력되고 서버 종료
         process.exit(1); 
     }
 }
