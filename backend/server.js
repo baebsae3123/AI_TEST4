@@ -24,50 +24,28 @@ const asyncMiddleware = fn => (req, res, next) => {
 };
 
 // ===================================
-// ===== MongoDB 모델 정의 (생략됨) =====
+// ===== MongoDB 모델 정의 (스키마 생략) =====
 // ===================================
-const movieSchema = new mongoose.Schema({
-    id: { type: String, unique: true, sparse: true },
-    title: String,
-    genre: String,
-    releaseDate: Date,
-    popularity: Number
-});
+const movieSchema = new mongoose.Schema({ /* ... */ });
+const musicSchema = new mongoose.Schema({ /* ... */ });
+const selectionSchema = new mongoose.Schema({ /* ... */ });
 
-const musicSchema = new mongoose.Schema({
-    id: { type: String, unique: true, sparse: true },
-    title: String,
-    artist: String,
-    genre: String,
-    popularity: Number
-});
-
-const selectionSchema = new mongoose.Schema({
-    userId: String,
-    selectedIds: [String],
-    createdAt: { type: Date, default: Date.now }
-});
-
-// 모델 재정의 방지 (핫 리로드 대비)
+// 모델 재정의 방지
 const Movie = mongoose.models.Movie || mongoose.model("Movie", movieSchema);
 const Music = mongoose.models.Music || mongoose.model("Music", musicSchema);
 const Selection = mongoose.models.Selection || mongoose.model("Selection", selectionSchema);
 
 
 // ===================================
-// ===== 미들웨어 및 정적 파일 설정 =====
+// ===== 미들웨어 및 요청 로깅 설정 =====
 // ===================================
 
-// --- 1. CORS 설정 강화 ---
+// --- 1. CORS 설정 강화 (404/fetch 오류 방지) ---
 const allowedOrigins = [
-    // 로컬 환경 (개발용)
     'http://localhost:3000', 
     'http://localhost:4000',
-    // Render/Vercel 배포 주소 허용
     'https://*.onrender.com', // Render 도메인 허용
     'https://*.vercel.app'    // Vercel 도메인 허용
-    // 💡 실제 프론트엔드 URL을 여기에 명시적으로 추가하는 것이 가장 안전합니다.
-    // 예: 'https://my-frontend-app.onrender.com'
 ];
 
 const corsOptions = {
@@ -91,25 +69,38 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// --- 2. 요청 로그 미들웨어 추가 (추가된 부분) ---
+// --- 2. 상세 요청 URL 및 Body 로깅 미들웨어 (디버깅용) ---
 app.use((req, res, next) => {
-    // Render 로그에 요청 정보 출력
-    console.log(`📡 [API Request] Method: ${req.method} | Path: ${req.url} | Time: ${new Date().toISOString()}`);
+    // 요청 스키마 (http/https)와 호스트를 조합하여 전체 URL 구성
+    const protocol = req.protocol; 
+    const host = req.get('host'); 
+    const fullUrl = `${protocol}://${host}${req.originalUrl}`; 
+    
+    // 로그 출력: 전체 URL, 메소드, 경로
+    console.log(`\n========================================================================`);
+    console.log(`📡 [Full API Request] URL: ${fullUrl}`); 
+    console.log(`\tMethod: ${req.method} | Path: ${req.originalUrl} | Time: ${new Date().toISOString()}`);
+
+    // POST/PUT 요청일 경우, Body 데이터 출력
+    if (req.method === 'POST' || req.method === 'PUT') {
+        console.log(`\t📄 Body Data: ${JSON.stringify(req.body)}`);
+    }
+    console.log(`========================================================================`);
     next();
 });
-// ---------------------------------------------
+// --------------------------------------------------------
 
-// --- 3. 정적 파일 경로 주석 처리 ---
-// 프론트엔드를 별도 배포하므로, 이 코드는 경로 오류 방지를 위해 주석 처리합니다.
+// --- 3. 정적 파일 경로 주석 처리 (프론트엔드 분리 배포 가정) ---
 /*
 app.use(express.static(path.resolve(process.cwd(), "HumanMovieProject-main")));
 */
 
 
 // ===================================
-// ===== 질문 API (동일) =====
+// ===== 질문 API =====
 // ===================================
 app.get("/questions", (req, res) => {
+    // 💡 요청 로그가 미들웨어에서 처리되므로, 이 곳은 깔끔하게 유지합니다.
     const questions = [
         { id: 1, title: "선호 장르/소재", type: "multi", maxSelect: 3, options: ["액션","코미디","로맨스","드라마","SF·판타지","스릴러·공포","애니","다큐"] },
         { id: 2, title: "감상 목적·정서 성향", type: "multi", maxSelect: 2, options: ["가볍게 웃으며","깊은 여운","몰입감 높은 스릴","설렘·따뜻함"] },
@@ -121,7 +112,7 @@ app.get("/questions", (req, res) => {
 });
 
 // ===================================
-// ===== select1~3, recommend, selections API (동일) =====
+// ===== 기타 API (select, recommend, selections) (동일) =====
 // ===================================
 app.get("/select1", asyncMiddleware(async (req, res) => {
     const topMovies = await Movie.find().sort({ popularity: -1 }).limit(5);
@@ -142,6 +133,7 @@ app.get("/select3", asyncMiddleware(async (req, res) => {
 
 app.post("/recommend", asyncMiddleware(async (req, res) => {
     const selectedIds = Array.isArray(req.body?.selectedIds) ? req.body.selectedIds : [];
+    // ... (추천 로직 생략)
     const validObjectIds = selectedIds
         .filter(id => mongoose.Types.ObjectId.isValid(id))
         .map(id => new mongoose.Types.ObjectId(id));
@@ -196,7 +188,7 @@ app.use((err, req, res, next) => {
 });
 
 // ===================================
-// ===== 서버 시작 + Render 포트 대응 (동일) =====
+// ===== 서버 시작 + Render 포트 대응 (최종) =====
 // ===================================
 async function main() {
     try {
@@ -213,7 +205,8 @@ async function main() {
 
     } catch (err) {
         console.error("❌ MongoDB connection error:", err);
-        process.exit(1);
+        // MongoDB 연결 실패 시 Render 로그에 명확히 출력되고 서버 종료
+        process.exit(1); 
     }
 }
 
